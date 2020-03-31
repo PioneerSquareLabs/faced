@@ -1,4 +1,8 @@
-import tensorflow as tf
+try:
+    import tensorflow.compat.v1 as tf
+except ImportError:
+    import tensorflow as tf
+
 import cv2
 import numpy as np
 import os
@@ -8,7 +12,6 @@ from faced.utils import iou
 
 
 class FaceDetector(object):
-
     def __init__(self):
         self.load_model(os.path.join(MODELS_PATH, "face_yolo.pb"))
         self.load_aux_vars()
@@ -32,11 +35,13 @@ class FaceDetector(object):
                 with tf.gfile.GFile(yolo_model, "rb") as f:
                     graph_def = tf.GraphDef()
                     graph_def.ParseFromString(f.read())
-                    tf.import_graph_def(graph_def, name="") # If not, name is appended in op name
+                    tf.import_graph_def(
+                        graph_def, name=""
+                    )  # If not, name is appended in op name
 
             else:
                 ckpt_path = tf.train.latest_checkpoint(yolo_model)
-                saver = tf.train.import_meta_graph('{}.meta'.format(ckpt_path))
+                saver = tf.train.import_meta_graph("{}.meta".format(ckpt_path))
                 saver.restore(self.sess, ckpt_path)
 
             self.img = tf.get_default_graph().get_tensor_by_name("img:0")
@@ -52,7 +57,10 @@ class FaceDetector(object):
         input_img = cv2.resize(frame, (YOLO_SIZE, YOLO_SIZE)) / 255.
         input_img = np.expand_dims(input_img, axis=0)
 
-        pred = self.sess.run([self.prob, self.x_center, self.y_center, self.w, self.h], feed_dict={self.training: False, self.img: input_img})
+        pred = self.sess.run(
+            [self.prob, self.x_center, self.y_center, self.w, self.h],
+            feed_dict={self.training: False, self.img: input_img},
+        )
 
         bboxes = self._absolute_bboxes(pred, frame, thresh)
         bboxes = self._correct(frame, bboxes)
@@ -74,8 +82,11 @@ class FaceDetector(object):
         ret = []
 
         for j in range(x.shape[0]):
-            xc, yc = int((x[j]/YOLO_TARGET)*img_w), int((y[j]/YOLO_TARGET)*img_h)
-            wi, he = int(w[j]*img_w), int(h[j]*img_h)
+            xc, yc = (
+                int((x[j] / YOLO_TARGET) * img_w),
+                int((y[j] / YOLO_TARGET) * img_h),
+            )
+            wi, he = int(w[j] * img_w), int(h[j] * img_h)
             ret.append((xc, yc, wi, he, p[j]))
 
         return ret
@@ -93,7 +104,7 @@ class FaceDetector(object):
             curr_max_p = bboxes[i][-1]
             curr_max_index = i
 
-            for j in range(i+1, N):
+            for j in range(i + 1, N):
                 if status[j] is not None:
                     continue
 
@@ -120,10 +131,10 @@ class FaceDetector(object):
 
             MARGIN = 0.5
             # Add margin
-            xmin = int(max(0, x - w/2 - MARGIN*w))
-            xmax = int(min(img_w, x + w/2 + MARGIN*w))
-            ymin = int(max(0, y - h/2 - MARGIN*h))
-            ymax = int(min(img_h, y + h/2 + MARGIN*h))
+            xmin = int(max(0, x - w / 2 - MARGIN * w))
+            xmax = int(min(img_w, x + w / 2 + MARGIN * w))
+            ymin = int(max(0, y - h / 2 - MARGIN * h))
+            ymax = int(min(img_h, y + h / 2 + MARGIN * h))
 
             face = frame[ymin:ymax, xmin:xmax, :]
             x, y, w, h = self.face_corrector.predict(face)
@@ -134,7 +145,6 @@ class FaceDetector(object):
 
 
 class FaceCorrector(object):
-
     def __init__(self):
         self.load_model(os.path.join(MODELS_PATH, "face_corrector.pb"))
 
@@ -146,11 +156,13 @@ class FaceCorrector(object):
                 with tf.gfile.GFile(corrector_model, "rb") as f:
                     graph_def = tf.GraphDef()
                     graph_def.ParseFromString(f.read())
-                    tf.import_graph_def(graph_def, name="") # If not, name is appended in op name
+                    tf.import_graph_def(
+                        graph_def, name=""
+                    )  # If not, name is appended in op name
 
             else:
                 ckpt_path = tf.train.latest_checkpoint(corrector_model)
-                saver = tf.train.import_meta_graph('{}.meta'.format(ckpt_path))
+                saver = tf.train.import_meta_graph("{}.meta".format(ckpt_path))
                 saver.restore(self.sess, ckpt_path)
 
             self.img = tf.get_default_graph().get_tensor_by_name("img:0")
@@ -166,14 +178,17 @@ class FaceCorrector(object):
         input_img = cv2.resize(input_img, (CORRECTOR_SIZE, CORRECTOR_SIZE)) / 255.
         input_img = np.reshape(input_img, [1, CORRECTOR_SIZE, CORRECTOR_SIZE, 3])
 
-        x, y, w, h = self.sess.run([self.x, self.y, self.w, self.h], feed_dict={self.training: False, self.img: input_img})
+        x, y, w, h = self.sess.run(
+            [self.x, self.y, self.w, self.h],
+            feed_dict={self.training: False, self.img: input_img},
+        )
 
         img_h, img_w, _ = frame.shape
 
-        x = int(x*img_w)
-        w = int(w*img_w)
+        x = int(x * img_w)
+        w = int(w * img_w)
 
-        y = int(y*img_h)
-        h = int(h*img_h)
+        y = int(y * img_h)
+        h = int(h * img_h)
 
         return x, y, w, h
